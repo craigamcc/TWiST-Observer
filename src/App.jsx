@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Square, Settings, MonitorUp, Layout, FileVideo, Upload } from 'lucide-react';
+import { Square, Settings, MonitorUp, Layout, FileVideo, Upload, Camera } from 'lucide-react';
 import { TWIST_PERSONAS } from './services/personas';
 import { twistOrchestrator } from './services/orchestrator';
 import { audioService } from './services/AudioService';
@@ -15,7 +15,7 @@ function App() {
   const [debugMsg, setDebugMsg] = useState('');
   
   // Storage for video mode
-  const [videoMode, setVideoMode] = useState(null); // 'stream', 'demo', or 'local'
+  const [videoMode, setVideoMode] = useState(null); // 'stream', 'demo', 'local', or 'camera'
   
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
@@ -24,6 +24,26 @@ function App() {
   const [apiUrl, setApiUrl] = useState(llmService.endpointUrl || '');
   const [apiModel, setApiModel] = useState(llmService.modelName || 'gemini-1.5-flash');
   const [sttUrl, setSttUrl] = useState(llmService.sttUrl || '');
+  const [sttStatus, setSttStatus] = useState('unknown'); // 'unknown', 'online', 'offline'
+
+  useEffect(() => {
+    const checkStt = async () => {
+        if (apiProvider === 'local') {
+            try {
+                const checkUrl = sttUrl || 'http://localhost:8000/';
+                const res = await fetch(checkUrl, { signal: AbortSignal.timeout(2000) });
+                setSttStatus(res.ok ? 'online' : 'offline');
+            } catch (e) {
+                setSttStatus('offline');
+            }
+        } else {
+            setSttStatus('unknown');
+        }
+    };
+    checkStt();
+    const interval = setInterval(checkStt, 10000);
+    return () => clearInterval(interval);
+  }, [apiProvider, sttUrl]);
 
   const endOfFeedRef = useRef(null);
   const videoRef = useRef(null);
@@ -168,6 +188,23 @@ function App() {
       }
   };
 
+  const handleStartCamera = async () => {
+      audioService.initContext();
+      try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              videoRef.current.muted = true; // Mute local preview to prevent feedback
+              try { await videoRef.current.play(); } catch (err) { console.error(err); }
+          }
+          setVideoMode('camera');
+          startAnalysisLoop(stream);
+      } catch (e) {
+          window.dispatchEvent(new CustomEvent('twist_debug', { detail: `Camera Error: ${e.message}` }));
+          console.warn("Camera access denied", e);
+      }
+  };
+
   return (
     <>
       <header className="header">
@@ -185,14 +222,22 @@ function App() {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem'}}>
-          <div className="status-badge">
-            <div className="status-indicator" style={{ background: isPlaying ? '#34d399' : '#f87171' }} />
-            {isPlaying ? 'System Active' : 'Offline'}
-          </div>
-          <button className="icon-btn" onClick={() => setShowSettings(true)}>
-            <Settings size={20} />
-          </button>
-        </div>
+           <div className="status-badge">
+             <div className="status-indicator" style={{ background: isPlaying ? '#34d399' : '#f87171' }} />
+             {isPlaying ? 'System Active' : 'Offline'}
+           </div>
+           
+           {apiProvider === 'local' && (
+             <div className="status-badge" style={{ background: 'rgba(255,255,255,0.05)' }}>
+               <div className="status-indicator" style={{ background: sttStatus === 'online' ? '#34d399' : (sttStatus === 'offline' ? '#ef4444' : '#64748b') }} />
+               STT: {sttStatus.toUpperCase()}
+             </div>
+           )}
+
+           <button className="icon-btn" onClick={() => setShowSettings(true)}>
+             <Settings size={20} />
+           </button>
+         </div>
       </header>
 
       {showSettings && (
@@ -237,7 +282,7 @@ function App() {
             {apiProvider === 'local' && (
               <>
                 <label>Local STT Endpoint (Whisper)</label>
-                <input type="text" value={sttUrl} onChange={e => setSttUrl(e.target.value)} placeholder="http://localhost:8080/v1/audio/transcriptions" />
+                <input type="text" value={sttUrl} onChange={e => setSttUrl(e.target.value)} placeholder="http://localhost:8000/v1/audio/transcriptions" />
                 <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.2rem' }}>Required for Local Mode if not using Gemini.</p>
               </>
             )}
@@ -248,7 +293,7 @@ function App() {
                     setApiProvider('local');
                     setApiModel('qwen-3.5-7b');
                     setApiUrl('http://localhost:11434/api/chat');
-                    setSttUrl('http://localhost:8080/v1/audio/transcriptions');
+                    setSttUrl('http://localhost:8000/v1/audio/transcriptions');
                     setApiKey('');
                   }}
                   style={{ flex: 1, padding: '0.5rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px dashed #64748b' }}
@@ -272,7 +317,7 @@ function App() {
             <video 
                ref={videoRef} 
                autoPlay 
-               muted={videoMode === 'stream'}
+               muted={videoMode === 'stream' || videoMode === 'camera'}
                controls={videoMode === 'demo' || videoMode === 'local'}
                style={{ width: '100%', height: '100%', objectFit: 'contain', display: isPlaying ? 'block' : 'none' }} 
                crossOrigin="anonymous"
@@ -280,20 +325,27 @@ function App() {
             <canvas ref={canvasRef} style={{ display: 'none' }} />
 
             {!isPlaying && (
-              <div className="video-overlay" style={{ display: 'flex', gap: '2rem' }}>
+              <div className="video-overlay" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem', padding: '2rem' }}>
                 
                 <div style={{ textAlign: 'center' }}>
-                  <button className="play-button" onClick={handleStartScreenShare}>
+                  <button className="play-button" onClick={handleStartScreenShare} style={{ background: '#3b82f6' }}>
                     <MonitorUp size={32} />
                   </button>
-                  <div style={{ marginTop: '1rem', color: '#fff', opacity: 0.8 }}>Live Share Tab</div>
+                  <div style={{ marginTop: '1rem', color: '#fff', opacity: 0.8 }}>Share Tab</div>
+                </div>
+
+                <div style={{ textAlign: 'center' }}>
+                  <button className="play-button" onClick={handleStartCamera} style={{ background: '#10b981', boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)' }}>
+                    <Camera size={32} />
+                  </button>
+                  <div style={{ marginTop: '1rem', color: '#fff', opacity: 0.8 }}>Live Camera</div>
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
                   <button className="play-button" onClick={handleStartDemo} style={{ background: '#f59e0b', boxShadow: '0 0 20px rgba(245, 158, 11, 0.4)' }}>
                     <FileVideo size={32} />
                   </button>
-                  <div style={{ marginTop: '1rem', color: '#fff', opacity: 0.8 }}>Load Demo File</div>
+                  <div style={{ marginTop: '1rem', color: '#fff', opacity: 0.8 }}>Load Demo</div>
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
@@ -301,7 +353,7 @@ function App() {
                   <button className="play-button" onClick={() => fileInputRef.current?.click()} style={{ background: '#8b5cf6', boxShadow: '0 0 20px rgba(139, 92, 246, 0.4)' }}>
                     <Upload size={32} />
                   </button>
-                  <div style={{ marginTop: '1rem', color: '#fff', opacity: 0.8 }}>Upload VCR Mode</div>
+                  <div style={{ marginTop: '1rem', color: '#fff', opacity: 0.8 }}>VCR Mode</div>
                 </div>
 
               </div>

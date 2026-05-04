@@ -21,3 +21,6 @@ Thumbs.db
 
 # Debug
 test_*.js
+
+# Media
+public/demo.mp4

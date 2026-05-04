@@ -5,7 +5,7 @@
 
 **TWiST Observer** is a localized, real-time AI sidebar explicitly built for the **$5,000 *This Week in Startups* Challenge** set by @jason and @twistartups.
 
-It is a true open-source, browser-first application that listens to the podcast (via live tab capture or VCR file uploads) and generates a multi-persona intelligence feed overlaid on the broadcast. It fulfills 100% of the core competition requirements while introducing **Multimodal Vision** and **Swarm Memory** to beat the current top entries.
+It is a true open-source, browser-first application that listens to the podcast (via live tab capture, live camera, or VCR file uploads) and generates a multi-persona intelligence feed overlaid on the broadcast. It fulfills 100% of the core competition requirements while introducing **Multimodal Vision** and **Swarm Memory** to beat the current top entries.
 
 ---
 
@@ -43,35 +43,53 @@ Fully customizable via the UI Settings modal:
 - **Ollama (Local)**: Complete offline execution for the truest open-source deployment.
 - **Grok / OpenAI API**: Plugs right into xAI for raw Grok-fueled intelligence.
 
+### 5. Live Camera Mode (Face-to-Face)
+You can directly interact with the Swarm using your webcam and microphone. The personas will see your facial expressions, surroundings, and hear your voice in real-time, making it a true conversational AI partner.
+
 ---
 
-## 🛠️ Architecture & Deployment
+## 🛠️ Architecture & Standalone Capability
 
-This was designed for a "dead-simple deploy". It is a pure React frontend. There are no WebSockets, Python backends, or complex Docker configurations to mess with. You can deploy this to Vercel in 60 seconds.
+TWiST Observer is now fully **standalone**. While the frontend runs in the browser, it can leverage a local specialist backend for high-quality, private AI processing.
 
-- **Audio/Video Capture**: `MediaRecorder` + `AudioContext` (Digital Extraction)
-- **State Management**: React Hooks + Custom Publisher/Subscriber Orchestrator classes.
-- **Styling**: Pure CSS with premium Glassmorphism (blurs, cubic-bezier slides, pulsing states).
+- **Frontend**: React + Vite (Glassmorphism UI, MediaRecorder Pipeline)
+- **Local STT Server**: A dedicated Python service (`server/stt_service.py`) that bridges raw audio to **MLX Whisper (Large v3 Turbo)** on Apple Silicon or standard Whisper on other hardware.
+- **Provider Agnostic**: Switch between Gemini (Cloud), Ollama (Local LLM), or the custom STT server (Private Transcription) via the settings modal.
 
 ---
 
 ## ⚡ Running it locally
 
+### 1. Start the Frontend
 ```bash
-# Clone the repository
-cd TWiST-Observer
-
 # Install dependencies
 npm install
 
-# Start the Vercel-ready dev server
+# Start the dev server
 npm run dev
 ```
 
-1. Open `http://localhost:5173`.
-2. Click the configuration Gear in the top right to paste your Gemini or Grok API Key.
-3. Choose your mode: **Live Share Tab**, **Load Demo**, or **Upload VCR Mode**.
-4. Watch the Swarm go to work!
+### 2. Start the Specialist STT Server (Optional for Local AI)
+To use high-quality local transcription instead of Gemini:
+```bash
+# Setup virtual environment
+cd server
+python3 -m venv venv
+source venv/bin/activate
+
+# Install requirements
+pip install -r requirements.txt
+
+# Start the server
+python stt_service.py
+```
+
+### 3. Configuration
+1. Open `http://localhost:5188` (or your assigned port).
+2. Click the configuration Gear ⚙️.
+3. If using **Local Mode**, ensure the STT status indicator in the header turns **ONLINE**.
+4. Choose your mode: **Live Share Tab**, **Live Camera**, **Load Demo**, or **Upload VCR Mode**.
+5. Watch the Swarm go to work!
 
 ---
 

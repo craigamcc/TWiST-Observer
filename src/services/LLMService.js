@@ -162,15 +162,30 @@ class LLMService {
              const data = await response.json();
              return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
          } else {
-             // Use explicit STT URL or fallback to endpointUrl logic
-             const baseUrl = this.sttUrl || (this.endpointUrl ? this.endpointUrl.replace('/chat/completions', '/audio/transcriptions') : 'https://api.openai.com/v1/audio/transcriptions');
+             // Use explicit STT URL or fallback to local/OpenAI defaults
+             let baseUrl = this.sttUrl;
+             if (!baseUrl) {
+                 if (this.provider === 'local') {
+                     baseUrl = 'http://localhost:8000/v1/audio/transcriptions';
+                 } else {
+                     baseUrl = this.endpointUrl ? this.endpointUrl.replace('/chat/completions', '/audio/transcriptions') : 'https://api.openai.com/v1/audio/transcriptions';
+                 }
+             }
+
+             window.dispatchEvent(new CustomEvent('twist_debug', { detail: `STT Request: ${baseUrl}` }));
+
              const formData = new FormData();
              formData.append('file', audioBlob, 'audio.webm');
              formData.append('model', 'whisper-1');
              
+             const headers = {};
+             if (this.provider !== 'local') {
+                 headers['Authorization'] = `Bearer ${this.apiKey}`;
+             }
+
              const response = await fetch(baseUrl, {
                   method: 'POST',
-                  headers: { 'Authorization': `Bearer ${this.apiKey}` },
+                  headers: headers,
                   body: formData
              });
              
