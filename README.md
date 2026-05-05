@@ -9,6 +9,14 @@ It is a true open-source, browser-first application that listens to the podcast 
 
 ---
 
+## 📸 App in Action
+
+| Landing & Modes | Settings & BYOK | Swarm Intelligence Feed |
+|:---:|:---:|:---:|
+| ![Landing Page](public/screenshots/landing_page.png) | ![Settings Modal](public/screenshots/settings_modal.png) | ![Swarm Action](public/screenshots/swarm_action.png) |
+
+---
+
 ## 🏆 Competition Checklist & Features
 
 This application was engineered specifically against the brief. Here is how it scores:
